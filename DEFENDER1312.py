@@ -14,8 +14,6 @@ import nmap
 import asyncio
 import ipaddress
 import argparse
-
-
 from port_scanner import scan_ports
 from typing import List, Dict
 from tqdm import tqdm
@@ -96,11 +94,26 @@ async def check_ports(host, port_range):
         print(f"Error checking port {port}: {e}")
     return open_ports
 
+async def check_host(host: str, port_range: str) -> Dict[int, bool]:
+    """
+    Scans a single host on multiple ports.
+    Returns a dictionary of open ports.
+    """
+    open_ports = {}
+    for port in range(*parse_port_range(port_range)):
+        if await check_port(host, port):
+            open_ports[port] = True
+        else:
+            open_ports[port] = False
+    return open_ports
+
 async def check_hosts(target_hosts, port_range):
     tasks = []
     for host in target_hosts:
         tasks.append(check_ports(host, port_range))
-    await asyncio.gather(*tasks)
+    results = await asyncio.gather(*tasks)
+    return results
+
 
 if __name__ == '__main__':
     host = 'localhost'
@@ -151,23 +164,17 @@ async def scan_ports(ip, port_range):
     return open_ports
 
 async def main():
-    # get target IP address and port range from user input
-    target_ip = input("Enter target IP address: ")
-    port_range = tuple(map(int, input("Enter port range (start:end): ").split(":")))
+    target_hosts = []
+    while True:
+        target_host = input("Enter target IP address: ")
+        if not target_host:
+            break
+        target_hosts.append(target_host)
+    port_range = input("Enter port range (start:end): ")
+    results = await check_hosts(target_hosts, port_range)
+    for result in results:
+        print_open_ports(result)
 
-    # scan ports on target IP address
-    open_ports = await scan_ports(target_ip, port_range)
-    if open_ports:
-        print(f"Open ports on {target_ip}: {open_ports}")
-    else:
-        print(f"No open ports found on {target_ip}")
-
-    # scan ports on multiple hosts
-    target_hosts = get_hosts_from_subnet(target_ip)
-    if target_hosts:
-        await check_ports(target_hosts, port_range)
-    else:
-        print(f"No hosts found on subnet of {target_ip}")
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -176,19 +183,19 @@ if __name__ == "__main__":
 def check_multiple_ports(host:str, ports:List[int], timeout:int=2) -> Dict[int, bool]:
     """
     Checks multiple ports on a single host.
-    Returns a dictionary of ports with boolean values indicating whether the port is open or not.
+    Returns a dictionary with port numbers as keys and booleans as values.
     """
-    open_ports = {}  # Initialize an empty dictionary to store the open ports
+    results = {}  # Initialize an empty dictionary to store the results
     for port in ports:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # Create a new socket object
-        s.settimeout(timeout)  # Set the timeout for the socket
-        try:
-            s.connect((host, port))  # Try to connect to the port
-            open_ports[port] = True  # If the connection is successful, the port is open
-        except:
-            open_ports[port] = False  # If the connection fails, the port is closed
-        s.close()  # Close the socket
-    return open_ports  # Return the dictionary of open ports
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(timeout)  # Set the socket timeout
+            try:
+                s.connect((host, port))  # Attempt to connect to the host and port
+                results[port] = True  # If successful, mark the port as open
+            except:
+                results[port] = False  # If unsuccessful, mark the port as closed
+    return results  # Return the dictionary of results
+
 
 # Define a function to scan multiple hosts on multiple ports
 def check_hosts(hosts:List[str], ports:List[int], timeout:int=2) -> Dict[str, Dict[int, bool]]:
