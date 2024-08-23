@@ -1,0 +1,4 @@
+netifaces
+click
+python-nmap
+scapy
