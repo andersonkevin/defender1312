@@ -17,7 +17,7 @@ Clone your fork locally:
 
 bash
 Copy code
-git clone https://github.com/your-username/defender1312.git
+git clone https://github.com/andersonkevin/defender1312.git
 Create a new branch:
 
 bash
